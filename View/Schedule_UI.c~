@@ -1,0 +1,207 @@
+﻿
+#include <stdio.h>
+#include <stdlib.h>
+#include"../Service/Struct.h"
+#include "Schedule_UI.h"
+#include "Play_UI.h"
+
+#include "../Common/List.h"
+#include "../Service/Schedule.h"
+#include "../Service/Play.h"
+#include "../Service/Studio.h"
+#include "../Service/EntityKey.h"
+
+
+static const int SCHEDULE_PAGE_SIZE = 2;
+
+//显示所有演出计划
+	void Schedule_UI_ListAll(void) {
+	int i,id;
+	char choice;
+	schedule_list_t head;
+	schedule_node_t *pos;
+	Pagination_t paging;
+	List_Init(head,schedule_node_t);//初始化链表
+	paging.offset = 0;
+	paging.pageSize = SCHEDULE_PAGE_SIZE;
+	paging.totalRecords = Schedule_Srv_FetchAll(head);
+	Paging_Locate_FirstPage(head,paging);
+	do {
+		printf("\n\t\t******************************** 计划表 *************************\n");
+		printf("\t%10s  %10s  %8s  %10s  %10s  %10s\n", "ID", "剧目ID", "演出厅ID","放映日期","放映时间","座位数");
+		printf("\t\t*****************************************************************\n");
+		Paging_ViewPage_ForEach(head,paging,schedule_node_t,pos,i){
+
+			printf("\t%10d  %10d  %8d  %4d-%2d-%2d   %2d:%2d  %10d\n",pos->data.id,pos->data.play_id,pos->data.studio_id,pos->data.date.year,pos->data.date.month,pos->data.date.day,pos->data.time.hour,pos->data.time.minute,pos->data.seat_count);
+		}
+	printf("\t\t-------总记录数:%2d ----------------------- 页数： %2d/%2d ----\n",paging.totalRecords, Pageing_CurPage(paging),	Pageing_TotalPages(paging));
+
+		printf("\t\t******************************************************************\n");
+	printf("\t\t==================================================================\n");
+		printf("\t\t [N]:下一页   [P]:上一页\n");
+		printf("\t\t [A]:  添加     [D]:  删除  \n");
+		printf("\t\t [U]:  修改    [Q]:  查询 \n");
+ 		printf("\t\t Please Input :");
+		fflush(stdin);
+		scanf(" %c",&choice);
+		fflush(stdin);
+		switch(choice){
+		case 'a':
+		case 'A':
+				 if(Schedule_UI_Add(id))	{
+					paging.totalRecords = Schedule_Srv_FetchAll(head);
+					Paging_Locate_LastPage(head, paging, schedule_node_t);
+				   }
+				break;
+	 	case 'd':
+		case 'D': printf("\t\t请输入ID：");
+			  scanf("%d",&id);
+			if(Schedule_UI_Delete(id)) {
+					paging.totalRecords = Schedule_Srv_FetchAll(head);
+				List_Paging(head, paging, schedule_node_t);
+			}
+			break;
+		 case 'u':
+		 case 'U':
+			printf("\t\t请输入ID:");
+			scanf("%d",&id);
+			if(Schedule_UI_Modify(id)){
+				paging.totalRecords = Schedule_Srv_FetchAll(head);
+				List_Paging(head, paging, schedule_node_t);
+			}
+				break;
+		case 'q':
+		case 'Q':
+				printf("\t\t请输入ID：");
+				scanf("%d",&id);
+				Schedule_UI_Query(id);
+				break;
+		case 'P':
+		case 'p':
+  			 if (!Pageing_IsFirstPage(paging)) {
+				Paging_Locate_OffsetPage(head, paging, -1, schedule_node_t);
+			}
+			break;
+		case 'n':
+		case 'N':
+			if (!Pageing_IsLastPage(paging)) {
+				Paging_Locate_OffsetPage(head, paging, 1, schedule_node_t);
+			}
+			break;
+		}		
+
+	}while(choice !='r'&&choice !='R');
+	List_Destroy(head,schedule_node_t);
+}
+
+//增加演出计划
+//int Schedule_UI_Add(int play_id) 
+
+int Schedule_UI_Add(int id) {
+	schedule_t rec;int art=0;
+	printf("请输入剧目ID：");
+	scanf("%d",&rec.play_id);
+	printf("请输入演出厅ID：");
+	scanf("%d",&rec.studio_id);
+	printf("放映日期 :");
+	scanf("%d%d%d",&rec.date.year,&rec.date.month,&rec.date.day);
+	printf("放映时间 :");
+	scanf("%d%d%d",&rec.time.hour,&rec.time.minute,&rec.time.second);
+	printf("座位数:");
+	scanf("%d",&rec.seat_count);
+	rec.id=EntKey_Srv_CompNewKey("schedule");
+	printf("id=%d\n",rec.id);
+	if(Schedule_Srv_Add(&rec)) 
+	{
+		printf("添加成功！\n");
+		fflush(stdin);
+		getchar();
+		getchar();
+		art = 1;
+	} else {
+		printf("添加失败！\n");
+		getchar();
+		getchar();	
+	}
+       return art;
+}
+
+//修改
+
+int Schedule_UI_Modify(int id){
+	schedule_t rec;
+	int rnt = 0;
+	if(!Schedule_Srv_FetchByID(id,&rec)) {
+		printf("ID已存在\n");
+		getchar();
+		getchar();
+		return rnt;
+	}
+	printf("请输入剧目ID：");
+	scanf("%d",&rec.play_id);
+	printf("请输入演出厅ID：");
+	scanf("%d",&rec.studio_id);
+	printf("放映日期 :");
+	scanf("%d%d%d",&rec.date.year,&rec.date.month,&rec.date.day);
+	printf("放映时间 :");
+	scanf("%d%d%d",&rec.time.hour,&rec.time.minute,&rec.time.second);
+	printf("座位数:");
+	scanf("%d",&rec.seat_count);
+	rec.id=EntKey_Srv_CompNewKey("schedule");
+	if(Schedule_Srv_Modify(&rec)) {
+		printf("修改成功！\n");
+		getchar();
+		getchar();
+		rnt = 1;
+		return rnt;
+ 	}
+		printf("修改失败！\n");
+		getchar();
+		getchar();
+		return rnt;
+}
+//删除
+int Schedule_UI_Delete(int id){
+	schedule_t rec;
+	int rnt=0;
+	if(!Schedule_Srv_DeleteByID(id)) {
+		printf("ID 不存在\n");
+		getchar();
+		getchar();
+		return rnt;
+	}
+	if(!Schedule_Srv_DeleteByID(id)) {
+		printf("删除失败！\n");
+		getchar();
+		getchar();
+		return rnt;
+	}
+	printf("删除成功！\n");
+	getchar();
+	getchar();
+	rnt = 1;
+	return rnt;
+}
+//根据ID查询
+int Schedule_UI_Query(int id){
+ 	schedule_t rec;
+	if(!Schedule_Srv_FetchByID(id,&rec)) {
+		printf("ID已存在n");
+		getchar();
+		getchar();
+		return 0;
+	}
+	printf("%10s  %10s  %8s  %10s  %10s  %10s\n", "ID", "剧目ID", "演出厅ID","放映日期","放映时间","座位数");
+	printf("%10d  %10d  %8d  %4d-%2d-%2d   %2d:%2d  %10d\n",rec.id,rec.play_id,rec.studio_id,rec.date.year,rec.date.month,rec.date.day,rec.time.hour,rec.time.minute,rec.seat_count);
+	return 0;
+}
+/*以列表模式显示给定剧目的演出计划信息*/
+
+void Schedule_UI_ListByPlay(const play_t *play, schedule_list_t list, Pagination_t paging){
+	// 请补充完整
+}
+//根据剧目ID管理演出计划
+void Schedule_UI_MgtEntry(int play_id)
+{}
+Schedule_UI_menu(){}
+

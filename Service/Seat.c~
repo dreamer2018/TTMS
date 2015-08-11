@@ -1,0 +1,186 @@
+/*
+ *  Seat.c
+ *
+ *  Created on: 2015年6月12日
+ *  Author: lc
+ */
+#include<stdio.h>
+#include <stdlib.h>
+#include"Struct.h"
+#include "../Common/List.h"
+#include "../Persistence/Seat_Persist.h"
+#include "EntityKey.h"
+#include "Seat.h"
+
+//添加单个座位函数
+inline int Seat_Srv_Add(const seat_t *data)
+{
+	return Seat_Perst_Insert(data);
+}
+
+//批量添加座位函数
+inline int Seat_Srv_AddBatch(seat_list_t list)
+{
+       return Seat_Perst_InsertBatch(list);
+}
+
+//修改座位函数
+inline int Seat_Srv_Modify(const seat_t *data)
+{
+       return Seat_Perst_Update(data);
+}
+
+//据id删除座位
+inline int Seat_Srv_DeleteByID(int ID)
+{	
+       return Seat_Perst_DeleteByID(ID);
+}
+
+//根据演出厅id删除所有座位
+inline int Seat_Srv_FetchByID(int ID, seat_t *buf)
+{
+       return Seat_Perst_SelectByID(ID,buf);
+}
+
+//根据演出厅ID载入座位
+inline int Seat_Srv_DeleteAllByRoomID(int roomID)
+{
+       return Seat_Perst_DeleteAllByRoomID(roomID);
+}
+
+//根据id获取座位
+int Seat_Srv_FetchByRoomID(seat_list_t list, int roomID)
+{
+	int SeatCount=0;
+	printf("Test2++++++++++++");
+       if(Seat_Perst_SelectByRoomID(list,roomID))
+       {
+       		Seat_Srv_SortSeatList(list);
+       		SeatCount=1;
+       	}
+       	return SeatCount;
+}
+
+/*根据放映厅ID提取有效的座位*/
+int Seat_Srv_FetchValidByRoomID(seat_list_t list, int roomID)
+{
+	int count=0;
+       Seat_Perst_SelectByRoomID(list,roomID);
+       seat_list_t p;
+       p=list->next;
+       while(p!=list)
+       {
+       		if(p->data.status==SEAT_GOOD)
+       			count++;
+       		p=p->next;
+       }
+       Seat_Srv_SortSeatList(list);
+       return count;
+}
+
+//根据行、列数初始化演出厅的座位
+int Seat_Srv_RoomInit(seat_list_t list, int roomID, int rowsCount,int colsCount) 
+{
+	int seatID,i,j;
+	seat_list_t p;
+	//seatID=EntKey_Srv_CompNewKey("seat");
+	//printf("Test__________\n");
+	for(i=0;i<rowsCount;i++)
+	{
+		for(j=0;j<colsCount;j++)
+		{
+			p=(seat_node_t *)malloc(sizeof(seat_node_t));
+			seatID=EntKey_Srv_CompNewKey("seat");
+			p->data.id=seatID;
+			p->data.roomID=roomID;
+			p->data.row=i;
+			p->data.column=j;
+			p->data.status=SEAT_GOOD;
+			List_AddTail(list,p);
+		}
+	}
+	Seat_Perst_InsertBatch(list) ;
+}
+
+//对座位链表list进行按座位行号和列号排序
+void Seat_Srv_SortSeatList(seat_list_t list) 
+{
+	seat_list_t listLeft=NULL,p;
+	
+       if(list==NULL)
+       {
+       		printf("链表为空！");
+       }
+       else
+       {
+       		list->prev->next=NULL;
+       		listLeft=list->next;
+       		list->next=list->prev=list;
+       		while(listLeft!=NULL)
+       		{
+       			p=listLeft;
+       			listLeft=listLeft->next;
+       			Seat_Srv_AddToSoftedList(list,p);
+       		}
+       }
+}
+
+//将结点node加入到已排序链表list中
+void Seat_Srv_AddToSoftedList(seat_list_t list, seat_node_t *node) 
+{
+	seat_list_t p;
+	if(list==NULL)
+	{
+		List_AddTail(list, node);
+	}
+	else
+	{
+		while(!((p->data.row<node->data.row)||(p->data.row==node->data.row)&&(p->data.column<node->data.column)))
+		{
+				p=p->next;
+		}
+		List_AddTail(list, node);
+	}
+}
+
+//根据行号
+inline seat_node_t * Seat_Srv_FindByRowCol(seat_list_t list, int row, int column)
+ {
+       int SeatCount=0;
+       if(Seat_Perst_SelectByRoomID(list,row)==0)
+       {
+       		list=NULL;
+       }
+       else
+       {
+	       seat_node_t *p;
+	       p=list->next;
+	       while(p!=list)
+	       {
+	       		if(p->data.status==SEAT_GOOD)
+	       		{
+	       			SeatCount--;
+	       		}
+	       		p=p->next;
+	       		SeatCount++;
+	       }
+	       Seat_Srv_SortSeatList(list);
+	}
+       return list;
+}
+
+
+inline seat_node_t * Seat_Srv_FindByID(seat_list_t list, int rowID) 
+{
+	seat_list_t p;
+	p=list->next;
+	while(p!=list)
+	{
+		if(rowID==p->data.id)
+		{
+			return p;
+		}
+		p=p->next;
+	}
+	return NULL;
+}

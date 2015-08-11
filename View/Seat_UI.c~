@@ -1,0 +1,214 @@
+/*
+ *  Seat_UI.c
+ *
+ *  Created on: 2015年5月23日
+ *  Author: lc
+ */
+
+#include <stdio.h>
+#include "../Service/EntityKey.h"
+#include "../Common/List.h"
+#include"../Service/Struct.h"
+#include "../Service/Studio.h"
+#include "../Service/Seat.h"
+#include "Seat_UI.h"
+
+//根据状态返回对应表示状态符号
+inline char Seat_UI_Status2Char(seat_status_t status) 
+{
+	if(status==SEAT_GOOD)
+	{
+		return '#';
+	}else if(status==SEAT_BROKEN)
+	{
+		return '~';
+	}else if(status==SEAT_NONE)
+	{
+		return ' ';
+	}
+}
+
+//根据状态符号返回桌位状态
+inline seat_status_t Seat_UI_Char2Status(char statusChar) 
+{
+	if(statusChar=='#')
+		return SEAT_GOOD;
+	if(statusChar=='~')
+		 return SEAT_BROKEN;
+	if(statusChar==' ') 
+		return SEAT_NONE;
+}
+
+int Seat_UI_Add(seat_list_t list, int roomID, int row, int column) 
+{
+	int newRecCount=0;
+	int rows,columns,id;
+	seat_list_t s=NULL;
+	seat_t *p;
+	char choice;
+	do
+	{
+		system("clear");
+		printf("\n\t\t===========================================\n");
+		printf("\t\t**************  添加新坐位  ***************\n");
+		printf("\t\t==========================================\n");
+		printf("\t\t输入添加座位的行，列号(空格隔开):");
+		scanf("%d%d",&rows,&columns);
+		getchar();
+		if(row<rows||column<columns)
+		{
+			printf("\t\t超出座位限度,添加失败！\n");
+		}
+		else
+		{
+			if(Seat_Srv_FindByRowCol(list,rows,columns))
+				printf("\t\t座位存在!\n");
+			else
+			{
+				id=EntKey_Srv_CompNewKey("seat");
+				p=(seat_t *)malloc(sizeof(seat_t));
+				p->id=id;
+				p->roomID=roomID;
+				p->row=rows;
+				p->column=columns;
+				p->status=SEAT_NONE;
+			//	printf("Test");
+				if(Seat_Srv_Add(p))
+				{
+					newRecCount++;
+					s=(seat_node_t*)malloc(sizeof(seat_node_t));
+					s->data.roomID=roomID;
+					s->data.row=rows;
+					s->data.column=columns;
+					s->data.status=SEAT_NONE;
+					List_AddTail(list,s);
+					printf("\t\t成功添加!\n");
+				}
+				else
+				{
+					free(p);
+					free(s);
+					printf("\t\t添加失败!\n");
+				}
+				free(p);
+			}
+		}
+		printf("\t\t==========================================\n");
+		printf("\t\t[A]继续  or [R] 返回");
+		scanf("%c",&choice);
+	}while(choice=='a'||choice=='A');
+	return newRecCount;
+}
+
+//修改座位函数
+int Seat_UI_Modify(seat_list_t list,int rowCount,int colsCount)
+{
+	int n,sign;
+	char ch;
+	seat_list_t head;
+	head=list;
+	while(sign)
+	{
+		if(head->data.row<rowCount || head->data.column<colsCount)
+		{
+				printf("要修改的座位行/列超出演出厅内的座位行/列范围！\n");
+		}
+		else
+		{
+			head->data.row=rowCount;
+			head->data.column=colsCount;
+			printf("修改成功!");
+		}
+		printf("修改完成?(Y/N)");
+		while(1)
+		{
+			ch=getchar();
+			if(89==ch || 121==ch)
+			{
+				sign=1;
+				break;
+			}
+			else if(78==ch || 110==ch)
+			{
+				sign=0;
+				break;
+			}
+			else
+				printf("输入错误，请重新输入！\n");
+		}
+	}
+}
+
+
+//删除座位函数
+int Seat_UI_Delete(seat_list_t list, int row, int column) 
+{
+	seat_list_t  p;
+	p=list->next;
+	while(p!=list)
+	{
+		if(p->data.row==row&&p->data.column==column)
+		{
+			List_DelNode(p);
+		}
+		p=p->next;
+	} 
+}
+
+//座位管理函数
+void Seat_UI_MgtEntry(int roomID) 
+{
+	int i;
+	char choice;
+	seat_list_t list;
+	//list=(seat_node_t *)malloc(sizeof(seat_node_t));
+	int roomIDs, row,column;
+	studio_t *p=NULL;
+	p=(studio_t *)malloc(sizeof(studio_t));
+	if(Studio_Srv_FetchByID(roomID,p))
+	{
+		system("clear");
+		/*
+		if(0==Seat_Srv_FetchByRoomID(list,roomID))
+		{
+			Seat_Srv_RoomInit(list,roomID,p->rowsCount,p->colsCount);
+			Studio_Srv_Modify(p);
+		}*/
+		do
+		{
+			printf("\t\t============================================\n");
+			printf("\t\t**【A】添加座位      【U】修改座位        **\n");
+			printf("\t\t**【D】删除座位      【R】返回上一级      **\n");
+			printf("\t\t============================================\n");
+			printf("\t\tYour Choice:");
+			fflush(stdin);
+			scanf("\t\t%c", &choice);
+			switch (choice)
+			{
+				case 'A': ;
+				case 'a': 
+						Seat_UI_Add(list,roomID,p->rowsCount,p->colsCount);			
+						break;
+				case 'U':
+				case 'u':
+						Seat_UI_Modify(list,p->rowsCount,p->colsCount);
+						break;
+				case 'D': 	;
+				case 'd':
+						printf("请输入行：");
+						scanf("%d",&row);
+						printf("请输入列：");
+						scanf("%d",&column);
+						Seat_UI_Delete(list,row,column);
+						break;
+				case 'r':
+				case 'R':	break;
+			}
+		} while (choice != 'r' && choice != 'R');
+	}
+	else
+	{
+		printf("演出厅不存在！\n");
+	}
+}
+
